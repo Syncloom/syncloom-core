@@ -1,0 +1,22 @@
+syntax = "proto3";
+package syncloom.sync.v1;
+
+// Server-streaming change feed. Authenticate with `authorization: Bearer <device token>`.
+service Sync {
+  // Streams every change visible to the caller with cursor > since, then stays open and
+  // pushes new changes as they happen. Heartbeat messages have cursor == 0 and empty kind.
+  rpc Subscribe(SubscribeRequest) returns (stream Change);
+}
+
+message SubscribeRequest {
+  int64 since = 1;
+}
+
+message Change {
+  int64 cursor = 1;
+  string node_id = 2;
+  // node | version | trash | restore | purge | kv | share
+  string kind = 3;
+  string version_id = 4;
+  string kv_key = 5;
+}

@@ -1,0 +1,62 @@
+[package]
+name = "syncloom-core"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Sven Walther <sven@syncloom.de>"]
+repository = "https://github.com/Syncloom/syncloom-core"
+description = "Shared protocol, crypto, chunking, merge and sync engine for Syncloom"
+
+[lib]
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[features]
+default = ["client"]
+# HTTP client + sync engine + local state DB (native only)
+client = ["grpc", "dep:reqwest", "dep:rusqlite", "dep:walkdir"]
+grpc = ["dep:tonic", "dep:prost", "dep:tokio"]
+# UniFFI bindings for Swift / Kotlin
+uniffi = ["client", "dep:uniffi"]
+# wasm-bindgen exports for the web app (build with --no-default-features)
+wasm = ["dep:wasm-bindgen", "dep:getrandom"]
+# C ABI (JSON in, JSON out) for the Windows app and other hosts without generated bindings
+capi = ["uniffi"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+blake3 = "1"
+fastcdc = "3"
+chacha20poly1305 = "0.10"
+argon2 = "0.5"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+hkdf = "0.12"
+sha2 = "0.10"
+rand = "0.8"
+base64 = "0.22"
+unicode-normalization = "0.1"
+diffy = "0.4"
+zeroize = "1"
+hex = "0.4"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking", "stream"], optional = true }
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"], optional = true }
+tonic = { version = "0.12", optional = true, default-features = false, features = ["codegen", "prost", "transport", "tls", "tls-roots"] }
+prost = { version = "0.13", optional = true }
+walkdir = { version = "2", optional = true }
+uniffi = { version = "0.28", optional = true, features = ["cli"] }
+wasm-bindgen = { version = "0.2", optional = true }
+getrandom = { version = "0.2", features = ["js"], optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[build-dependencies]
+tonic-build = "0.12"
+protoc-bin-vendored = "3"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["uniffi"]
