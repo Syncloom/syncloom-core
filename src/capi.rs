@@ -96,6 +96,12 @@ fn dispatch(req: &Value) -> Result<Value, String> {
         "restore" => Ok(node(&session(req)?.restore(s(req, "id")?).map_err(e)?)),
         "upload_new_file" => Ok(node(&session(req)?.upload_new_file(opt(req, "parent"), s(req, "name")?, s(req, "path")?, req.get("mtime_ms").and_then(|x| x.as_i64()).unwrap_or(0), false).map_err(e)?)),
         "download_file" => session(req)?.download_file(s(req, "id")?, opt(req, "version"), s(req, "dest")?).map(|_| json!(true)).map_err(e),
+        "upload_version" => Ok(node(&session(req)?.upload_version(s(req, "id")?, opt(req, "base_version"), s(req, "path")?, req.get("mtime_ms").and_then(|x| x.as_i64()).unwrap_or(0)).map_err(e)?)),
+        "move_to" => Ok(node(&session(req)?.move_to(s(req, "id")?, opt(req, "new_parent")).map_err(e)?)),
+        "changes" => {
+            let r = session(req)?.changes(req.get("since").and_then(|x| x.as_i64()).unwrap_or(0), req.get("limit").and_then(|x| x.as_i64()).unwrap_or(500)).map_err(e)?;
+            Ok(json!({ "next_cursor": r.next_cursor, "changes": r.changes.iter().map(|c| json!({ "cursor": c.cursor, "node_id": c.node_id, "kind": c.kind })).collect::<Vec<_>>() }))
+        }
         "create_link" => Ok(json!({ "url": session(req)?.create_link(s(req, "id")?, opt(req, "password"), None, None).map_err(e)?.url })),
         "mfa_methods" => Ok(Value::Array(session(req)?.mfa_methods().map_err(e)?.iter().map(|m| json!({ "id": m.id, "kind": m.kind, "name": m.name })).collect())),
         "changes_head" => Ok(json!(session(req)?.changes_head().map_err(e)?)),
@@ -155,6 +161,9 @@ mod tests {
         assert!(call(json!({ "op": "nope" }))["error"].as_str().unwrap().contains("unknown op"));
         assert!(call(json!({ "op": "list", "handle": 12345 }))["error"].as_str().unwrap().contains("handle"));
         assert!(call(json!({ "op": "login" }))["error"].as_str().unwrap().contains("missing"));
+        for op in ["upload_version", "move_to", "changes"] {
+            assert!(call(json!({ "op": op, "handle": 12345 }))["error"].as_str().unwrap().contains("handle"), "{op} is part of the C ABI");
+        }
         assert!(call(json!("not an object"))["error"].is_string());
         let unreachable = call(json!({ "op": "login", "server": "http://127.0.0.1:1", "username": "a", "password": "b", "device": "t" }));
         assert!(unreachable["error"].is_string());

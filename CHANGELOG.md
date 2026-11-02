@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [semantic versioning](https://semver.org/). Syncloom is a public preview until 1.0.
 
+## [Unreleased]
+
+### Added
+- C ABI operations `upload_version`, `move_to` and `changes`, for the Windows on-demand files engine.
+
 ## [0.1.0] - 2026-11-02
 
 First public preview.
