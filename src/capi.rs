@@ -97,6 +97,19 @@ fn dispatch(req: &Value) -> Result<Value, String> {
         "upload_new_file" => Ok(node(&session(req)?.upload_new_file(opt(req, "parent"), s(req, "name")?, s(req, "path")?, req.get("mtime_ms").and_then(|x| x.as_i64()).unwrap_or(0), false).map_err(e)?)),
         "download_file" => session(req)?.download_file(s(req, "id")?, opt(req, "version"), s(req, "dest")?).map(|_| json!(true)).map_err(e),
         "upload_version" => Ok(node(&session(req)?.upload_version(s(req, "id")?, opt(req, "base_version"), s(req, "path")?, req.get("mtime_ms").and_then(|x| x.as_i64()).unwrap_or(0)).map_err(e)?)),
+        "versions" => Ok(Value::Array(session(req)?.versions(s(req, "id")?).map_err(e)?.iter().map(|v| json!({ "id": v.id, "size": v.size, "content_hash": v.content_hash, "created_at": v.created_at, "device": v.device })).collect())),
+        // the content hash of a local file, the same BLAKE3 that versions carry, to tell whether a local file equals a version on the server
+        "hash_file" => {
+            use std::io::Read;
+            let mut f = std::fs::File::open(s(req, "path")?).map_err(|x| x.to_string())?;
+            let (mut h, mut buf) = (blake3::Hasher::new(), vec![0u8; 1 << 20]);
+            loop {
+                let n = f.read(&mut buf).map_err(|x| x.to_string())?;
+                if n == 0 { break; }
+                h.update(&buf[..n]);
+            }
+            Ok(json!(h.finalize().to_hex().to_string()))
+        }
         "move_to" => Ok(node(&session(req)?.move_to(s(req, "id")?, opt(req, "new_parent")).map_err(e)?)),
         "changes" => {
             let r = session(req)?.changes(req.get("since").and_then(|x| x.as_i64()).unwrap_or(0), req.get("limit").and_then(|x| x.as_i64()).unwrap_or(500)).map_err(e)?;
@@ -157,11 +170,22 @@ mod tests {
     }
 
     #[test]
+    fn hash_file_matches_the_hash_versions_carry() {
+        let path = std::env::temp_dir().join(format!("syncloom-hash-{}", std::process::id()));
+        let data: Vec<u8> = (0..3_000_000u32).map(|i| (i * 31 % 251) as u8).collect(); // more than one read buffer
+        std::fs::write(&path, &data).unwrap();
+        let r = call(json!({ "op": "hash_file", "path": path.to_str().unwrap() }));
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(r["ok"].as_str().unwrap(), crate::chunking::content_hash(&data));
+        assert!(call(json!({ "op": "hash_file", "path": "/no/such/file" }))["error"].is_string());
+    }
+
+    #[test]
     fn errors_are_reported_as_json() {
         assert!(call(json!({ "op": "nope" }))["error"].as_str().unwrap().contains("unknown op"));
         assert!(call(json!({ "op": "list", "handle": 12345 }))["error"].as_str().unwrap().contains("handle"));
         assert!(call(json!({ "op": "login" }))["error"].as_str().unwrap().contains("missing"));
-        for op in ["upload_version", "move_to", "changes"] {
+        for op in ["upload_version", "move_to", "changes", "versions"] {
             assert!(call(json!({ "op": op, "handle": 12345 }))["error"].as_str().unwrap().contains("handle"), "{op} is part of the C ABI");
         }
         assert!(call(json!("not an object"))["error"].is_string());

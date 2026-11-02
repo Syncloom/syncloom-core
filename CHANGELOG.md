@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- C ABI operations `versions` and `hash_file` (BLAKE3 of a local file, the same hash the versions carry), so a client can tell whether a local file equals a version on the server.
 - C ABI operations `upload_version`, `move_to` and `changes`, for the Windows on-demand files engine.
 
 ## [0.1.0] - 2026-11-02
